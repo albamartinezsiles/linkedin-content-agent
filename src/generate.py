@@ -5,10 +5,10 @@ Genera un post de LinkedIn investigado + carrusel visual en PNG,
 y crea un issue en GitHub con todo para revisión.
 
 Variables de entorno requeridas:
-    GEMINI_API_KEY   - API key de Google AI Studio (gratis)
-    GITHUB_TOKEN     - provisto automáticamente por GitHub Actions
+    GEMINI_API_KEY    - API key de Google AI Studio (gratis)
+    GITHUB_TOKEN      - provisto automáticamente por GitHub Actions
     GITHUB_REPOSITORY - provisto automáticamente por GitHub Actions
-    PROFILE_YAML     - contenido del config/profile.yaml (secret)
+    PROFILE_YAML      - contenido del config/profile.yaml (secret)
 """
 
 import os
@@ -21,7 +21,8 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from google import genai
-from google.genai import types as genai_typesfrom playwright.sync_api import sync_playwright
+from google.genai import types as genai_types
+from playwright.sync_api import sync_playwright
 import requests
 
 
@@ -44,7 +45,6 @@ def load_config() -> dict:
     with open(CONFIG_DIR / "topics.yaml", "r", encoding="utf-8") as f:
         topics = yaml.safe_load(f)
 
-    # profile.yaml viene del secret PROFILE_YAML en Actions
     profile_path = CONFIG_DIR / "profile.yaml"
     if "PROFILE_YAML" in os.environ:
         profile_path.write_text(os.environ["PROFILE_YAML"], encoding="utf-8")
@@ -75,8 +75,6 @@ def save_state(state: dict) -> None:
 
 
 def pick_pillar(topics: dict, state: dict) -> dict:
-    """Rotación circular con peso — evita repetir pilar y salta ocasionalmente
-    pilares con weight < 1."""
     pillars = topics["pillars"]
     next_idx = (state["last_pillar_index"] + 1) % len(pillars)
     tries = 0
@@ -88,41 +86,42 @@ def pick_pillar(topics: dict, state: dict) -> dict:
 
 
 # ----------------------------------------------------------------------------
-# Llamada a Gemini
+# Llamada a Gemini (librería nueva google-genai)
 # ----------------------------------------------------------------------------
-SYSTEM_INSTRUCTION = """Eres un estratega de contenido de LinkedIn para perfiles técnicos en español.
+SYSTEM_INSTRUCTION = """Eres un estratega de contenido de LinkedIn para perfiles tecnicos en espanol.
 
 Tu trabajo es generar UN post de alta calidad que:
 
-1. Investiga tendencias recientes (últimas 2 semanas) relacionadas con el pilar asignado usando Google Search.
-2. Elige un ángulo NICHO — no el tema obvio, sino el contraintuitivo o poco tratado.
+1. Investiga tendencias recientes (ultimas 2 semanas) relacionadas con el pilar asignado usando Google Search.
+2. Elige un angulo NICHO, no el tema obvio sino el contraintuitivo o poco tratado.
 3. Escribe el post respetando exactamente la voz definida.
 4. Propone 5 slides para un carrusel visual (portada, 3 de contenido, cierre con CTA).
-5. Sugiere cómo este post posiciona al perfil respecto a oportunidades laborales.
+5. Sugiere como este post posiciona al perfil respecto a oportunidades laborales.
 
-FORMATO DE RESPUESTA — devuelve SOLO un objeto JSON válido, sin markdown, sin ```json, sin comentarios:
+FORMATO DE RESPUESTA: devuelve SOLO un objeto JSON valido, sin bloques de codigo markdown, sin comentarios.
 
+Estructura exacta del JSON:
 {
-  "research_summary": "2-3 frases sobre qué has encontrado investigando y por qué elegiste este ángulo",
-  "angle_chosen": "frase corta describiendo el ángulo único",
-  "hook_primary": "primera línea del post que para el scroll",
+  "research_summary": "2-3 frases sobre que has encontrado investigando y por que elegiste este angulo",
+  "angle_chosen": "frase corta describiendo el angulo unico",
+  "hook_primary": "primera linea del post que para el scroll",
   "hook_alternative": "gancho alternativo",
-  "post_body": "post completo listo para copiar, con \\n para saltos de línea, incluyendo gancho al inicio y hashtags al final",
+  "post_body": "post completo listo para copiar, con \\n para saltos de linea, incluyendo gancho al inicio y hashtags al final",
   "slides": [
-    {"type": "cover", "eyebrow": "PILAR EN MAYÚSCULAS", "title": "título grande de portada", "highlight_word": "palabra del título a destacar en rosa", "subtitle": "subtítulo de 1 línea"},
-    {"type": "content", "label": "01", "heading": "título del slide", "body": "texto del cuerpo, máx 25 palabras"},
-    {"type": "highlight", "big_number": "dato o cifra corta", "caption": "qué significa ese dato"},
-    {"type": "content", "label": "02", "heading": "título del slide", "body": "texto del cuerpo, máx 25 palabras"},
-    {"type": "outro", "title": "pregunta o afirmación de cierre", "highlight_word": "palabra a destacar", "cta_text": "invitación al engagement"}
+    {"type": "cover", "eyebrow": "PILAR EN MAYUSCULAS", "title": "titulo grande de portada", "highlight_word": "palabra del titulo a destacar en rosa", "subtitle": "subtitulo de 1 linea"},
+    {"type": "content", "label": "01", "heading": "titulo del slide", "body": "texto del cuerpo, max 25 palabras"},
+    {"type": "highlight", "big_number": "dato o cifra corta", "caption": "que significa ese dato"},
+    {"type": "content", "label": "02", "heading": "titulo del slide", "body": "texto del cuerpo, max 25 palabras"},
+    {"type": "outro", "title": "pregunta o afirmacion de cierre", "highlight_word": "palabra a destacar", "cta_text": "invitacion al engagement"}
   ],
-  "positioning_note": "1-2 frases sobre qué tipo de oferta/contacto puede atraer",
-  "best_publish_time": "HH:MM en horario España, con razonamiento breve"
+  "positioning_note": "1-2 frases sobre que tipo de oferta o contacto puede atraer",
+  "best_publish_time": "HH:MM en horario Espana, con razonamiento breve"
 }
 
 Reglas estrictas para los slides:
-- 'highlight_word' debe ser UNA palabra o expresión corta que aparezca literalmente en 'title'.
-- 'big_number' debe ser corto (máx 6 caracteres): "23%", "3h", "400+", "0€", etc.
-- Los textos de slide deben ser LEGIBLES a golpe de vista — no párrafos.
+- 'highlight_word' debe ser UNA palabra o expresion corta que aparezca literalmente en 'title'.
+- 'big_number' debe ser corto (max 6 caracteres): 23%, 3h, 400+, 0 euros, etc.
+- Los textos de slide deben ser LEGIBLES a golpe de vista, no parrafos.
 - Los slides deben poder leerse sin el post: cuentan la misma historia resumida.
 """
 
@@ -136,8 +135,8 @@ def build_user_prompt(profile: dict, voice: dict, pillar: dict, recent_angles: l
     return f"""PERFIL:
 Nombre: {profile['name']}
 Rol: {profile['role']}
-Ubicación: {profile['location']}
-Años de experiencia: {profile['years_experience']}
+Ubicacion: {profile['location']}
+Anios de experiencia: {profile['years_experience']}
 Enfoque: {profile['focus']}
 Diferenciadores: {', '.join(profile['differentiators'])}
 Oportunidades que busca: {profile.get('target_opportunities', 'desarrollo profesional general')}
@@ -145,7 +144,7 @@ Oportunidades que busca: {profile.get('target_opportunities', 'desarrollo profes
 VOZ:
 Estilo: {voice['style']}
 Longitud objetivo: {voice['length_chars'][0]}-{voice['length_chars'][1]} caracteres
-Hashtags: {voice['hashtags_count'][0]}-{voice['hashtags_count'][1]} al final, minúsculas
+Hashtags: {voice['hashtags_count'][0]}-{voice['hashtags_count'][1]} al final, minusculas
 
 EVITAR:
 {avoid_list}
@@ -154,16 +153,16 @@ HACER:
 {do_list}
 
 PILAR DE HOY: {pillar['name']} (id: {pillar['id']})
-Ángulo del pilar: {pillar['angle']}
-Ejemplos de ganchos que encajan (úsalos como referencia de tono, no copies):
+Angulo del pilar: {pillar['angle']}
+Ejemplos de ganchos que encajan (usalos como referencia de tono, no copies):
 {hooks}
 
-ÁNGULOS RECIENTES YA USADOS (no repetir): {recent}
+ANGULOS RECIENTES YA USADOS (no repetir): {recent}
 
 TAREA:
-1. Investiga con Google Search qué está pasando ESTA SEMANA sobre este pilar.
-2. Elige un ángulo nicho y fundamentado.
-3. Genera el JSON completo. SOLO el JSON, nada más.
+1. Investiga con Google Search que esta pasando ESTA SEMANA sobre este pilar.
+2. Elige un angulo nicho y fundamentado.
+3. Genera el JSON completo. SOLO el JSON, nada mas.
 """
 
 
@@ -176,7 +175,6 @@ def call_gemini(config: dict, pillar: dict, recent_angles: list) -> dict:
         config["profile"], config["topics"]["voice"], pillar, recent_angles
     )
 
-    # Google Search grounding — nueva API
     tools = None
     if gen_cfg.get("enable_search"):
         tools = [genai_types.Tool(google_search=genai_types.GoogleSearch())]
@@ -194,7 +192,7 @@ def call_gemini(config: dict, pillar: dict, recent_angles: list) -> dict:
 
     text = (response.text or "").strip()
 
-    # Limpiar fences por si el modelo los añade
+    # Limpiar fences markdown por si el modelo los anade a pesar de las instrucciones
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?\s*", "", text)
         text = re.sub(r"\s*```\s*$", "", text)
@@ -207,8 +205,9 @@ def call_gemini(config: dict, pillar: dict, recent_angles: list) -> dict:
             return json.loads(match.group(0))
         raise
 
+
 # ----------------------------------------------------------------------------
-# Renderizado de slides HTML → PNG
+# Renderizado de slides HTML -> PNG
 # ----------------------------------------------------------------------------
 def escape_html(text: str) -> str:
     return (
@@ -219,7 +218,6 @@ def escape_html(text: str) -> str:
 
 
 def highlight_in_title(title: str, word: str) -> str:
-    """Envuelve la palabra a destacar en un <span class='highlight'>."""
     if not word or word not in title:
         return escape_html(title)
     safe_title = escape_html(title)
@@ -229,8 +227,7 @@ def highlight_in_title(title: str, word: str) -> str:
     )
 
 
-def render_slide_content(slide: dict) -> tuple[str, str]:
-    """Devuelve (clase CSS, HTML interno) para un slide."""
+def render_slide_content(slide: dict):
     stype = slide.get("type", "content")
 
     if stype == "cover":
@@ -252,11 +249,10 @@ def render_slide_content(slide: dict) -> tuple[str, str]:
         inner = f"""
         <h2>{highlight_in_title(slide.get('title', ''), slide.get('highlight_word', ''))}</h2>
         <div class="cta-text">{escape_html(slide.get('cta_text', ''))}</div>
-        <div class="cta-box">Sígueme para más <span class="arrow">→</span></div>
+        <div class="cta-box">Sigueme para mas <span class="arrow">-></span></div>
         """
         return "outro", inner
 
-    # default: content
     inner = f"""
     <div class="label">{escape_html(slide.get('label', ''))}</div>
     <h2>{escape_html(slide.get('heading', ''))}</h2>
@@ -265,11 +261,9 @@ def render_slide_content(slide: dict) -> tuple[str, str]:
     return "content", inner
 
 
-def render_slides_to_png(slides: list, pillar_name: str) -> list[Path]:
-    """Renderiza cada slide como PNG usando Playwright."""
+def render_slides_to_png(slides: list, pillar_name: str) -> list:
     BUILD_DIR.mkdir(exist_ok=True)
 
-    # Leer plantilla base y CSS
     base_html = (TEMPLATES_DIR / "base.html").read_text(encoding="utf-8")
     css = (TEMPLATES_DIR / "styles.css").read_text(encoding="utf-8")
 
@@ -293,19 +287,17 @@ def render_slides_to_png(slides: list, pillar_name: str) -> list[Path]:
         html_path.write_text(html, encoding="utf-8")
         html_files.append(html_path)
 
-    # Capturar con Playwright
     png_paths = []
     with sync_playwright() as p:
         browser = p.chromium.launch()
         context = browser.new_context(
             viewport={"width": 1080, "height": 1350},
-            device_scale_factor=2,  # retina = crisp
+            device_scale_factor=2,
         )
         page = context.new_page()
 
         for i, html_path in enumerate(html_files, start=1):
             page.goto(f"file://{html_path}")
-            # Esperar a que las fuentes de Google se carguen
             page.evaluate("document.fonts.ready")
             page.wait_for_timeout(800)
 
@@ -319,11 +311,9 @@ def render_slides_to_png(slides: list, pillar_name: str) -> list[Path]:
 
 
 # ----------------------------------------------------------------------------
-# Creación del issue en GitHub
+# Creacion del issue en GitHub
 # ----------------------------------------------------------------------------
-def create_github_issue(
-    result: dict, pillar: dict, png_paths: list[Path], run_id: str | None
-) -> None:
+def create_github_issue(result, pillar, png_paths, run_id):
     token = os.environ["GITHUB_TOKEN"]
     repo = os.environ["GITHUB_REPOSITORY"]
     now = datetime.now(MADRID_TZ)
@@ -332,7 +322,7 @@ def create_github_issue(
     if run_id:
         artifact_url = f"https://github.com/{repo}/actions/runs/{run_id}"
         visual_links = (
-            f"\n\n📎 **Descarga el carrusel** (PNGs 1080×1350): "
+            f"\n\nDescarga el carrusel (PNGs 1080x1350): "
             f"[artifact del workflow]({artifact_url})\n"
         )
 
@@ -342,50 +332,48 @@ def create_github_issue(
         for i, s in enumerate(result.get("slides", []))
     )
 
-    body = f"""## 📌 Post de {pillar['name']}
+    body = f"""## Post de {pillar['name']}
 
 > {result.get('angle_chosen', '')}
 
-**Hora sugerida:** {result.get('best_publish_time', '—')}
+**Hora sugerida:** {result.get('best_publish_time', '-')}
 
 ---
 
-### 🔍 Investigación
+### Investigacion
 {result.get('research_summary', '')}
 
 ---
 
-### ✍️ Post listo para copiar
+### Post listo para copiar
 
-```
 {result.get('post_body', '')}
-```
 
 ---
 
-### 🪝 Gancho alternativo
+### Gancho alternativo
 
 > {result.get('hook_alternative', '')}
 
 ---
 
-### 🖼️ Carrusel ({len(png_paths)} slides)
+### Carrusel ({len(png_paths)} slides)
 
 {slides_preview}
 {visual_links}
 
 ---
 
-### 🎯 Por qué este post posiciona
+### Por que este post posiciona
 
 {result.get('positioning_note', '')}
 
 ---
 
-<sub>Generado por linkedin-content-agent · {now:%Y-%m-%d %H:%M} Madrid · Cierra este issue cuando publiques.</sub>
+<sub>Generado por linkedin-content-agent - {now:%Y-%m-%d %H:%M} Madrid - Cierra este issue cuando publiques.</sub>
 """
 
-    title = f"📝 {pillar['name']} — {now:%d/%m} — {result.get('angle_chosen', '')[:50]}"
+    title = f"Post {pillar['name']} - {now:%d/%m} - {result.get('angle_chosen', '')[:50]}"
 
     url = f"https://api.github.com/repos/{repo}/issues"
     headers = {
@@ -415,7 +403,7 @@ def main() -> int:
 
     print("Llamando a Gemini con Google Search...")
     result = call_gemini(config, pillar, state.get("recent_angles", []))
-    print(f"Ángulo elegido: {result.get('angle_chosen')}")
+    print(f"Angulo elegido: {result.get('angle_chosen')}")
 
     print("Renderizando slides...")
     png_paths = render_slides_to_png(result["slides"], pillar["name"])
@@ -425,7 +413,6 @@ def main() -> int:
     run_id = os.environ.get("GITHUB_RUN_ID")
     create_github_issue(result, pillar, png_paths, run_id)
 
-    # Actualizar estado
     state.setdefault("recent_angles", []).append(result.get("angle_chosen", "")[:80])
     state["recent_angles"] = state["recent_angles"][-12:]
     save_state(state)
