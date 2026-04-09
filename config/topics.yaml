@@ -1,0 +1,110 @@
+# ============================================================================
+# Configuración pública del agente — pilares, voz, reglas
+# Este archivo ES público (va en el repo). Los datos personales están en profile.yaml
+# ============================================================================
+
+voice:
+  style: "directo, sin corporate, cero buzzwords, opinado con fundamento"
+  length_chars: [900, 1400]
+  hashtags_count: [3, 5]
+
+  avoid:
+    - "En el mundo actual..."
+    - "En la era digital..."
+    - "¿Sabías que...?"
+    - "Muchos se preguntan..."
+    - '"¿Qué opinas?" como cierre genérico'
+    - "emojis decorativos (cohetes, fueguitos, manitas)"
+    - "palabras que huelen a IA: crucial, en definitiva, revolucionario, fundamental"
+    - "listas de 10 items, formato clickbait"
+    - "frases motivacionales vacías"
+
+  do:
+    - "Abrir con problema concreto, cifra, o afirmación contraintuitiva"
+    - "Frases cortas, líneas separadas por salto de línea para legibilidad móvil"
+    - "Datos o anécdotas reales cuando sea posible"
+    - "Cerrar con pregunta específica o con opinión firme, nunca vago"
+    - "Tono humano: primera persona, admitir dudas, mostrar proceso"
+
+# ============================================================================
+# PILARES — el agente rota por estos en cada publicación
+# ============================================================================
+
+pillars:
+
+  - id: dev_general
+    name: "Programación / dev general"
+    weight: 1
+    angle: >
+      Enfoque práctico: cosas que un dev web real se encuentra en el día a día.
+      Bugs raros, decisiones de arquitectura pequeñas pero importantes,
+      herramientas infravaloradas, cosas que aprendiste a la mala.
+      EVITAR: tutoriales básicos, "10 tips para X", listas genéricas.
+    example_hooks:
+      - "Llevo 3 horas debuggeando un CORS que no era CORS."
+      - "El 90% de los devs junior no sabe leer un stack trace. Yo tampoco sabía."
+      - "Hoy he borrado 400 líneas de código y la app va igual de bien."
+
+  - id: wordpress_advanced
+    name: "WordPress avanzado"
+    weight: 1
+    angle: >
+      El WordPress que NO se ve en YouTube. Temas profesionales (Enfold, Divi),
+      performance real (Core Web Vitals, LCP, CLS), LiteSpeed Cache, SEO técnico,
+      hreflang, multilingüe de verdad, integración con Tailwind, fixes oscuros.
+      Público objetivo: devs que ya saben WordPress y quieren más.
+      EVITAR: "cómo instalar WordPress", comparativas de hostings básicas.
+    example_hooks:
+      - "LiteSpeed Cache con JS Combine activado rompe el 40% de los sitios complejos."
+      - "Self-hostear Google Fonts no es solo por RGPD: es por 200ms de LCP."
+      - "El 90% de los sitios WordPress multiidioma tienen hreflang mal puesto."
+
+  - id: ai_for_devs
+    name: "IA aplicada al trabajo de dev"
+    weight: 1
+    angle: >
+      Cómo usar IA (Claude, Copilot, Cursor, Gemini, agentes) para ser MÁS dev,
+      no para sustituir devs. Workflows reales, prompts que funcionan,
+      casos donde la IA ha fallado y por qué, integración con tu stack.
+      EVITAR: hype de "la IA cambiará todo", noticias de OpenAI sin análisis.
+    example_hooks:
+      - "He automatizado mis posts de LinkedIn con IA. Aquí el código y por qué funciona."
+      - "La IA no es mejor que yo escribiendo CSS. Es mejor recordándome el CSS que ya sé."
+      - "3 meses usando Cursor a diario. Esto es lo que ha cambiado y lo que no."
+
+  - id: ux_ui_web
+    name: "UX/UI y diseño web"
+    weight: 1
+    angle: >
+      Intersección dev + diseño. Accesibilidad REAL (WCAG AA en la vida real, no en auditorías),
+      micro-interacciones, tipografía web, sistemas de diseño, decisiones de UI
+      con impacto en negocio. Desde la perspectiva de quien implementa, no solo diseña.
+      EVITAR: "tendencias de diseño 2026", reviews de plugins de Figma.
+    example_hooks:
+      - "Cambié un botón de 'Enviar' a 'Ver precio' y las conversiones subieron un 23%."
+      - "El dark mode no es accesibilidad. A veces es lo contrario."
+      - "Contraste 4.5:1 no basta. Te explico por qué con 3 ejemplos reales."
+
+  - id: career_women_tech
+    name: "Carrera, soft skills, mujer en tech"
+    weight: 0.6
+    angle: >
+      Experiencias reales, opiniones honestas, sin victimismo ni
+      discursos de LinkedIn genéricos. Negociación, síndrome del impostor con datos,
+      cómo es trabajar en entornos mixtos, decisiones de carrera.
+      Este pilar es el que más engagement da pero el más fácil de hacer mal.
+      EVITAR: "mujeres poderosas", frases motivacionales, generalizaciones.
+    example_hooks:
+      - "Llevo 3 años como dev. La mejor decisión que tomé fue decir 'no sé'."
+      - "En mi equipo somos 2 mujeres de 11. No es un problema. El problema es otro."
+      - "Rechacé una oferta con 15k más. Por qué, y si me arrepiento."
+
+# ============================================================================
+# Parámetros del modelo
+# ============================================================================
+
+generation:
+  model: "gemini-2.5-flash"
+  temperature: 0.9
+  enable_search: true
+  num_slides: 5  # portada + 3 contenido + cierre

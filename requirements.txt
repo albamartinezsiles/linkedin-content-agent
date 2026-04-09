@@ -1,0 +1,4 @@
+google-generativeai>=0.8.0
+PyYAML>=6.0
+playwright>=1.48.0
+requests>=2.32.0

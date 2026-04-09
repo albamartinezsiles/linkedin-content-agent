@@ -1,0 +1,27 @@
+# ============================================================================
+# PERFIL PERSONAL — NO COMMITEAR (está en .gitignore)
+# En GitHub Actions este archivo se genera desde el secret PROFILE_YAML
+# ============================================================================
+
+name: "Tu Nombre"
+role: "Tu rol (ej. Desarrolladora web full-stack | UX/UI)"
+location: "Tu ciudad, España"
+years_experience: 3
+
+focus: >
+  Describe tu enfoque en 1-2 frases. Qué haces, con qué stack, para quién.
+
+differentiators:
+  - "Diferenciador 1 — lo que te hace única frente a otros devs del montón"
+  - "Diferenciador 2"
+  - "Diferenciador 3"
+
+languages:
+  - "español"
+  - "inglés"
+  - "francés"
+
+# Qué tipo de oportunidades te interesan (ayuda al modelo a posicionar los posts)
+target_opportunities: >
+  Ej: posiciones senior en desarrollo web en empresas tech medianas,
+  proyectos freelance de alto nivel, roles con componente de UX/UI.
