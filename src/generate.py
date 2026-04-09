@@ -20,8 +20,8 @@ import re
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-import google.generativeai as genai
-from playwright.sync_api import sync_playwright
+from google import genai
+from google.genai import types as genai_typesfrom playwright.sync_api import sync_playwright
 import requests
 
 
@@ -169,35 +169,36 @@ TAREA:
 
 def call_gemini(config: dict, pillar: dict, recent_angles: list) -> dict:
     api_key = os.environ["GEMINI_API_KEY"]
-    genai.configure(api_key=api_key)
+    client = genai.Client(api_key=api_key)
 
     gen_cfg = config["topics"]["generation"]
     user_prompt = build_user_prompt(
         config["profile"], config["topics"]["voice"], pillar, recent_angles
     )
 
-    # Google Search grounding para Gemini 2.5
-    tools = [{"google_search": {}}] if gen_cfg.get("enable_search") else None
+    # Google Search grounding — nueva API
+    tools = None
+    if gen_cfg.get("enable_search"):
+        tools = [genai_types.Tool(google_search=genai_types.GoogleSearch())]
 
-    model = genai.GenerativeModel(
-        model_name=gen_cfg["model"],
-        system_instruction=SYSTEM_INSTRUCTION,
-        tools=tools,
-        generation_config={
-            "temperature": gen_cfg["temperature"],
-            "max_output_tokens": 4096,
-        },
+    response = client.models.generate_content(
+        model=gen_cfg["model"],
+        contents=user_prompt,
+        config=genai_types.GenerateContentConfig(
+            system_instruction=SYSTEM_INSTRUCTION,
+            temperature=gen_cfg["temperature"],
+            max_output_tokens=4096,
+            tools=tools,
+        ),
     )
 
-    response = model.generate_content(user_prompt)
-    text = response.text.strip()
+    text = (response.text or "").strip()
 
-    # Limpiar fences por si el modelo los añade a pesar de la instrucción
+    # Limpiar fences por si el modelo los añade
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?\s*", "", text)
         text = re.sub(r"\s*```\s*$", "", text)
 
-    # Intento parseo directo; si falla, busco el primer bloque JSON válido
     try:
         return json.loads(text)
     except json.JSONDecodeError:
@@ -205,7 +206,6 @@ def call_gemini(config: dict, pillar: dict, recent_angles: list) -> dict:
         if match:
             return json.loads(match.group(0))
         raise
-
 
 # ----------------------------------------------------------------------------
 # Renderizado de slides HTML → PNG
