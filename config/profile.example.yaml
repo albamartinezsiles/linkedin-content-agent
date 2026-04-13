@@ -1,27 +1,24 @@
-# ============================================================================
-# PERFIL PERSONAL — NO COMMITEAR (está en .gitignore)
-# En GitHub Actions este archivo se genera desde el secret PROFILE_YAML
-# ============================================================================
-
-name: "Tu Nombre"
-role: "Tu rol (ej. Desarrolladora web full-stack | UX/UI)"
-location: "Tu ciudad, España"
+name: "Alba Martínez Siles"
+role: "Desarrolladora web | UX/UI | Full-Stack"
+location: "Córdoba, España"
 years_experience: 3
 
 focus: >
-  Describe tu enfoque en 1-2 frases. Qué haces, con qué stack, para quién.
+  Desarrollo web full-stack con foco en WordPress empresarial,
+  UX/UI y uso intensivo de IA en el flujo de trabajo diario.
 
 differentiators:
-  - "Diferenciador 1 — lo que te hace única frente a otros devs del montón"
-  - "Diferenciador 2"
-  - "Diferenciador 3"
+  - "Desarrolladora web en entorno empresarial real, no agencia ni startup"
+  - "WordPress a nivel profundo (Elementor, performance, SEO técnico, multilingüe)"
+  - "Uso diario de IA como herramienta"
+  - "Formación cruzada en UX/UI + programación + comunicación"
 
 languages:
   - "español"
   - "inglés"
   - "francés"
 
-# Qué tipo de oportunidades te interesan (ayuda al modelo a posicionar los posts)
 target_opportunities: >
-  Ej: posiciones senior en desarrollo web en empresas tech medianas,
-  proyectos freelance de alto nivel, roles con componente de UX/UI.
+  Roles de desarrollo web junior o intermedio en empresas tech medianas,
+  posiciones híbridas dev + UX, proyectos freelance de alto nivel,
+  equipos donde pueda aportar tanto implementación como criterio de diseño.

@@ -15,6 +15,7 @@ import os
 import sys
 import json
 import random
+import time
 import yaml
 import re
 from datetime import datetime, timezone, timedelta
@@ -179,18 +180,45 @@ def call_gemini(config: dict, pillar: dict, recent_angles: list) -> dict:
     # Google Search grounding para Gemini 2.5
     tools = [{"google_search": {}}] if gen_cfg.get("enable_search") else None
 
-    model = genai.GenerativeModel(
-        model_name=gen_cfg["model"],
-        system_instruction=SYSTEM_INSTRUCTION,
-        tools=tools,
-        generation_config={
-            "temperature": gen_cfg["temperature"],
-            "max_output_tokens": 4096,
-        },
-    )
+    models_to_try = [gen_cfg["model"]] + gen_cfg.get("fallback_models", [])
+    last_error = None
 
-    response = model.generate_content(user_prompt)
-    text = response.text.strip()
+    for model_name in models_to_try:
+        print(f"Intentando con modelo: {model_name}")
+        model = genai.GenerativeModel(
+            model_name=model_name,
+            system_instruction=SYSTEM_INSTRUCTION,
+            tools=tools,
+            generation_config={
+                "temperature": gen_cfg["temperature"],
+                "max_output_tokens": 4096,
+            },
+        )
+
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = model.generate_content(user_prompt)
+                print(f"Respuesta obtenida con modelo: {model_name}")
+                text = response.text.strip()
+                break
+            except Exception as e:
+                last_error = e
+                is_transient = "503" in str(e) or "UNAVAILABLE" in str(e) or "overloaded" in str(e).lower() or "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)
+                if attempt < max_retries - 1 and is_transient:
+                    wait = 2 ** attempt * 5  # 5, 10, 20s
+                    print(f"{model_name} error transitorio - reintentando en {wait}s (intento {attempt+1}/{max_retries})...")
+                    time.sleep(wait)
+                elif is_transient:
+                    print(f"{model_name} agotó reintentos, probando siguiente modelo...")
+                    break
+                else:
+                    raise
+        else:
+            continue
+        break
+    else:
+        raise last_error
 
     # Limpiar fences por si el modelo los añade a pesar de la instrucción
     if text.startswith("```"):
