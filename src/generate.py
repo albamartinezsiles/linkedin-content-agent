@@ -248,15 +248,14 @@ def call_gemini(config: dict, pillar: dict, recent_angles: list) -> dict:
 
     models_to_try = [gen_cfg["model"]] + gen_cfg.get("fallback_models", [])
     last_error = None
-    response = None
 
     for model_name in models_to_try:
-        print(f"Intentando con modelo: {model_name}")
-        success = False
+        print(f"Intentando con modelo: {model_name}", flush=True)
         max_retries = 3
+        succeeded = False
         for attempt in range(max_retries):
             try:
-                response = client.models.generate_content(
+                resp = client.models.generate_content(
                     model=model_name,
                     contents=user_prompt,
                     config=genai_types.GenerateContentConfig(
@@ -266,27 +265,30 @@ def call_gemini(config: dict, pillar: dict, recent_angles: list) -> dict:
                         tools=tools,
                     ),
                 )
-                print(f"Respuesta obtenida con modelo: {model_name}")
-                success = True
+                if resp is None or resp.text is None:
+                    raise RuntimeError(f"{model_name} devolvió respuesta vacía")
+                print(f"Respuesta obtenida con modelo: {model_name}", flush=True)
+                text = resp.text.strip()
+                succeeded = True
                 break
             except Exception as e:
                 last_error = e
                 err_str = str(e)
-                is_transient = any(k in err_str for k in ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED")) or "overloaded" in err_str.lower()
+                is_transient = any(k in err_str for k in ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED", "respuesta vacía")) or "overloaded" in err_str.lower()
                 if not is_transient:
                     raise
                 if attempt < max_retries - 1:
                     wait = 2 ** attempt * 5
-                    print(f"{model_name} error transitorio - reintentando en {wait}s (intento {attempt+1}/{max_retries})...")
+                    print(f"{model_name} error transitorio - reintentando en {wait}s (intento {attempt+1}/{max_retries})...", flush=True)
                     time.sleep(wait)
                 else:
-                    print(f"{model_name} agotó reintentos, probando siguiente modelo...")
-        if success:
+                    print(f"{model_name} agotó reintentos, probando siguiente modelo...", flush=True)
+        if succeeded:
             break
     else:
-        raise last_error
+        raise RuntimeError(f"Todos los modelos fallaron. Último error: {last_error}")
 
-    text = (response.text or "").strip()
+    # text ya asignado en el bucle
 
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?\s*", "", text)
