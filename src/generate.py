@@ -252,6 +252,7 @@ def call_gemini(config: dict, pillar: dict, recent_angles: list) -> dict:
 
     for model_name in models_to_try:
         print(f"Intentando con modelo: {model_name}")
+        success = False
         max_retries = 3
         for attempt in range(max_retries):
             try:
@@ -266,23 +267,22 @@ def call_gemini(config: dict, pillar: dict, recent_angles: list) -> dict:
                     ),
                 )
                 print(f"Respuesta obtenida con modelo: {model_name}")
+                success = True
                 break
             except Exception as e:
                 last_error = e
                 err_str = str(e)
                 is_transient = any(k in err_str for k in ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED")) or "overloaded" in err_str.lower()
-                if attempt < max_retries - 1 and is_transient:
+                if not is_transient:
+                    raise
+                if attempt < max_retries - 1:
                     wait = 2 ** attempt * 5
                     print(f"{model_name} error transitorio - reintentando en {wait}s (intento {attempt+1}/{max_retries})...")
                     time.sleep(wait)
-                elif is_transient:
-                    print(f"{model_name} agotó reintentos, probando siguiente modelo...")
-                    break
                 else:
-                    raise
-        else:
-            continue
-        break
+                    print(f"{model_name} agotó reintentos, probando siguiente modelo...")
+        if success:
+            break
     else:
         raise last_error
 
