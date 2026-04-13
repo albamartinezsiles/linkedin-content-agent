@@ -1,34 +1,31 @@
 """
-LinkedIn Content Agent
-======================
-Genera un post de LinkedIn investigado + carrusel visual en PNG,
+LinkedIn Content Agent v2
+==========================
+Genera un post de LinkedIn anclado a una noticia reciente + carrusel visual,
 y crea un issue en GitHub con todo para revisión.
 
-Variables de entorno requeridas:
-    GEMINI_API_KEY   - API key de Google AI Studio (gratis)
-    GITHUB_TOKEN     - provisto automáticamente por GitHub Actions
-    GITHUB_REPOSITORY - provisto automáticamente por GitHub Actions
-    PROFILE_YAML     - contenido del config/profile.yaml (secret)
+Cambios v2:
+- Flujo en dos pasos: investigar -> elegir noticia -> escribir post
+- Nivel técnico calibrado "dev con 3 años"
+- Fallback a opinion piece técnico si no hay noticias buenas
+- Aprovecha search_queries y good_sources del topics.yaml
 """
 
 import os
 import sys
 import json
 import random
-import time
 import yaml
 import re
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types as genai_types
 from playwright.sync_api import sync_playwright
 import requests
 
 
-# ----------------------------------------------------------------------------
-# Rutas y constantes
-# ----------------------------------------------------------------------------
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG_DIR = ROOT / "config"
 TEMPLATES_DIR = ROOT / "templates"
@@ -38,21 +35,17 @@ STATE_PATH = CONFIG_DIR / "state.json"
 MADRID_TZ = timezone(timedelta(hours=1))
 
 
-# ----------------------------------------------------------------------------
-# Carga de configuración
-# ----------------------------------------------------------------------------
 def load_config() -> dict:
     with open(CONFIG_DIR / "topics.yaml", "r", encoding="utf-8") as f:
         topics = yaml.safe_load(f)
 
-    # profile.yaml viene del secret PROFILE_YAML en Actions
     profile_path = CONFIG_DIR / "profile.yaml"
     if "PROFILE_YAML" in os.environ:
         profile_path.write_text(os.environ["PROFILE_YAML"], encoding="utf-8")
 
     if not profile_path.exists():
         raise FileNotFoundError(
-            "Falta config/profile.yaml. Copia profile.example.yaml y rellénalo, "
+            "Falta config/profile.yaml. Copia profile.example.yaml y rellenalo, "
             "o define la variable de entorno PROFILE_YAML."
         )
 
@@ -76,8 +69,6 @@ def save_state(state: dict) -> None:
 
 
 def pick_pillar(topics: dict, state: dict) -> dict:
-    """Rotación circular con peso — evita repetir pilar y salta ocasionalmente
-    pilares con weight < 1."""
     pillars = topics["pillars"]
     next_idx = (state["last_pillar_index"] + 1) % len(pillars)
     tries = 0
@@ -88,43 +79,91 @@ def pick_pillar(topics: dict, state: dict) -> dict:
     return pillars[next_idx]
 
 
-# ----------------------------------------------------------------------------
-# Llamada a Gemini
-# ----------------------------------------------------------------------------
-SYSTEM_INSTRUCTION = """Eres un estratega de contenido de LinkedIn para perfiles técnicos en español.
+SYSTEM_INSTRUCTION = """Eres un estratega de contenido para perfiles tecnicos en LinkedIn.
 
-Tu trabajo es generar UN post de alta calidad que:
+Tu trabajo NO es generar contenido generico de autoayuda tech. Tu trabajo es producir
+posts ANCLADOS EN HECHOS REALES Y RECIENTES, con opinion fundamentada y nivel tecnico
+calibrado al perfil del autor.
 
-1. Investiga tendencias recientes (últimas 2 semanas) relacionadas con el pilar asignado usando Google Search.
-2. Elige un ángulo NICHO — no el tema obvio, sino el contraintuitivo o poco tratado.
-3. Escribe el post respetando exactamente la voz definida.
-4. Propone 5 slides para un carrusel visual (portada, 3 de contenido, cierre con CTA).
-5. Sugiere cómo este post posiciona al perfil respecto a oportunidades laborales.
+FLUJO OBLIGATORIO EN 2 FASES:
 
-FORMATO DE RESPUESTA — devuelve SOLO un objeto JSON válido, sin markdown, sin ```json, sin comentarios:
+FASE 1 - INVESTIGACION:
+Usa Google Search para buscar noticias y releases reales de los ultimos 14 dias
+sobre el pilar asignado. Usa las search_queries que te paso como punto de partida
+y prioriza los dominios listados en good_sources.
 
+Criterios de una BUENA noticia:
+- Release oficial de un framework, libreria o herramienta con nombre concreto
+- Cambio de API o deprecation con impacto real en devs
+- Benchmark, estudio o informe con numeros verificables
+- Bug conocido documentado con fix
+- Debate publico reciente entre figuras del sector con posturas claras
+
+Criterios de una MALA noticia (descartar):
+- Articulos tipo "10 tips para X" o "como ser mejor dev"
+- Opiniones genericas sin datos
+- Contenido mas viejo de 14 dias
+- Tutoriales sin noticia detras
+- Hype sin sustancia
+
+FASE 2 - DECISION Y ESCRITURA:
+
+Si encontraste al menos UNA noticia buena:
+- Elige la mas jugosa
+- Escribe el post ANCLADO a esa noticia, citandola explicitamente en el cuerpo
+- Incluye una opinion personal concreta, no neutra
+- Aporta contexto tecnico que el lector promedio no tendria
+- Si es posible, incluye un dato, numero o mini ejemplo de codigo
+
+Si NO encontraste noticias buenas:
+- Cambia a modo "opinion_piece"
+- Elige un problema REAL y concreto del pilar (no abstracto)
+- Escribe desde la experiencia tecnica del autor con ejemplos especificos
+- DEBE incluir nombres propios de herramientas, versiones o un mini ejemplo
+- NO debe sonar a reflexion generica
+
+NIVEL TECNICO CALIBRADO:
+- Publico objetivo: desarrollador/a con 3 anios de experiencia
+- SI ASUME que conoce: HTML, CSS, JS moderno, React basico, Git, npm, APIs REST
+- NO ASUME que conoce: Server Components, Suspense, Edge runtime, WASM,
+  AST, compilers internals, algoritmos de caching avanzados
+- Cuando uses un termino nicho, explicalo en 1 frase
+- Usa nombres propios sin miedo (Next.js, Vite, Astro, Tailwind, Bun)
+- Evita corporate, buzzwords, "en el mundo actual"
+
+FORMATO DE RESPUESTA:
+Devuelve SOLO un objeto JSON valido, sin bloques markdown.
+
+Estructura:
 {
-  "research_summary": "2-3 frases sobre qué has encontrado investigando y por qué elegiste este ángulo",
-  "angle_chosen": "frase corta describiendo el ángulo único",
-  "hook_primary": "primera línea del post que para el scroll",
+  "research_phase": {
+    "queries_used": ["q1", "q2", "q3"],
+    "news_found": [
+      {"title": "t", "url": "u", "date": "YYYY-MM-DD", "why_relevant": "1 frase"}
+    ],
+    "mode": "news_anchored" o "opinion_piece",
+    "mode_reason": "por que este modo"
+  },
+  "angle_chosen": "frase corta del angulo",
+  "hook_primary": "primera linea del post",
   "hook_alternative": "gancho alternativo",
-  "post_body": "post completo listo para copiar, con \\n para saltos de línea, incluyendo gancho al inicio y hashtags al final",
+  "post_body": "post completo listo para copiar con \\n reales. Si news_anchored debe citar la noticia. Debe tener ejemplos concretos. Hashtags al final.",
   "slides": [
-    {"type": "cover", "eyebrow": "PILAR EN MAYÚSCULAS", "title": "título grande de portada", "highlight_word": "palabra del título a destacar en rosa", "subtitle": "subtítulo de 1 línea"},
-    {"type": "content", "label": "01", "heading": "título del slide", "body": "texto del cuerpo, máx 25 palabras"},
-    {"type": "highlight", "big_number": "dato o cifra corta", "caption": "qué significa ese dato"},
-    {"type": "content", "label": "02", "heading": "título del slide", "body": "texto del cuerpo, máx 25 palabras"},
-    {"type": "outro", "title": "pregunta o afirmación de cierre", "highlight_word": "palabra a destacar", "cta_text": "invitación al engagement"}
+    {"type": "cover", "eyebrow": "PILAR", "title": "titulo", "highlight_word": "palabra", "subtitle": "subtitulo"},
+    {"type": "content", "label": "01", "heading": "titulo", "body": "max 25 palabras"},
+    {"type": "highlight", "big_number": "max 6 chars", "caption": "significado"},
+    {"type": "content", "label": "02", "heading": "titulo", "body": "max 25 palabras"},
+    {"type": "outro", "title": "cierre", "highlight_word": "palabra", "cta_text": "invitacion"}
   ],
-  "positioning_note": "1-2 frases sobre qué tipo de oferta/contacto puede atraer",
-  "best_publish_time": "HH:MM en horario España, con razonamiento breve"
+  "positioning_note": "1-2 frases sobre oportunidades",
+  "best_publish_time": "HH:MM con razonamiento"
 }
 
-Reglas estrictas para los slides:
-- 'highlight_word' debe ser UNA palabra o expresión corta que aparezca literalmente en 'title'.
-- 'big_number' debe ser corto (máx 6 caracteres): "23%", "3h", "400+", "0€", etc.
-- Los textos de slide deben ser LEGIBLES a golpe de vista — no párrafos.
-- Los slides deben poder leerse sin el post: cuentan la misma historia resumida.
+Reglas:
+- highlight_word debe aparecer LITERALMENTE en title
+- big_number max 6 chars
+- post_body: 1000-1500 caracteres
+- Los slides cuentan la historia resumida del post
 """
 
 
@@ -133,20 +172,27 @@ def build_user_prompt(profile: dict, voice: dict, pillar: dict, recent_angles: l
     do_list = "\n".join(f"  - {x}" for x in voice["do"])
     recent = "; ".join(recent_angles[-6:]) if recent_angles else "ninguno"
     hooks = "\n".join(f"  - {h}" for h in pillar.get("example_hooks", []))
+    queries = "\n".join(f"  - {q}" for q in pillar.get("search_queries", []))
+    sources = "\n".join(f"  - {s}" for s in pillar.get("good_sources", []))
+    technical_level = voice.get("technical_level", "dev con 3 anios")
+    today = datetime.now(MADRID_TZ).strftime("%Y-%m-%d")
 
-    return f"""PERFIL:
+    return f"""FECHA DE HOY: {today}
+
+PERFIL DEL AUTOR:
 Nombre: {profile['name']}
 Rol: {profile['role']}
-Ubicación: {profile['location']}
-Años de experiencia: {profile['years_experience']}
+Ubicacion: {profile['location']}
+Anios de experiencia: {profile['years_experience']}
 Enfoque: {profile['focus']}
 Diferenciadores: {', '.join(profile['differentiators'])}
 Oportunidades que busca: {profile.get('target_opportunities', 'desarrollo profesional general')}
 
 VOZ:
 Estilo: {voice['style']}
-Longitud objetivo: {voice['length_chars'][0]}-{voice['length_chars'][1]} caracteres
-Hashtags: {voice['hashtags_count'][0]}-{voice['hashtags_count'][1]} al final, minúsculas
+Longitud: {voice['length_chars'][0]}-{voice['length_chars'][1]} caracteres
+Hashtags: {voice['hashtags_count'][0]}-{voice['hashtags_count'][1]}, minusculas
+Nivel tecnico objetivo: {technical_level}
 
 EVITAR:
 {avoid_list}
@@ -154,78 +200,68 @@ EVITAR:
 HACER:
 {do_list}
 
+========================================
 PILAR DE HOY: {pillar['name']} (id: {pillar['id']})
-Ángulo del pilar: {pillar['angle']}
-Ejemplos de ganchos que encajan (úsalos como referencia de tono, no copies):
+========================================
+
+Angulo del pilar:
+{pillar['angle']}
+
+QUERIES DE BUSQUEDA (empieza por estas, anade si hace falta):
+{queries}
+
+FUENTES A PRIORIZAR si aparecen:
+{sources}
+
+Ejemplos de ganchos del estilo buscado (referencia, NO copiar):
 {hooks}
 
-ÁNGULOS RECIENTES YA USADOS (no repetir): {recent}
+ANGULOS RECIENTES YA USADOS (no repetir): {recent}
 
-TAREA:
-1. Investiga con Google Search qué está pasando ESTA SEMANA sobre este pilar.
-2. Elige un ángulo nicho y fundamentado.
-3. Genera el JSON completo. SOLO el JSON, nada más.
+========================================
+TAREA
+========================================
+
+Ejecuta el flujo de 2 fases:
+1. Investiga con Google Search usando las queries sugeridas
+2. Evalua resultados segun criterios buenos/malos
+3. Decide modo (news_anchored o opinion_piece)
+4. Genera el JSON completo
+
+Devuelve SOLO el JSON.
 """
 
 
 def call_gemini(config: dict, pillar: dict, recent_angles: list) -> dict:
     api_key = os.environ["GEMINI_API_KEY"]
-    genai.configure(api_key=api_key)
+    client = genai.Client(api_key=api_key)
 
     gen_cfg = config["topics"]["generation"]
     user_prompt = build_user_prompt(
         config["profile"], config["topics"]["voice"], pillar, recent_angles
     )
 
-    # Google Search grounding para Gemini 2.5
-    tools = [{"google_search": {}}] if gen_cfg.get("enable_search") else None
+    tools = None
+    if gen_cfg.get("enable_search"):
+        tools = [genai_types.Tool(google_search=genai_types.GoogleSearch())]
 
-    models_to_try = [gen_cfg["model"]] + gen_cfg.get("fallback_models", [])
-    last_error = None
-
-    for model_name in models_to_try:
-        print(f"Intentando con modelo: {model_name}")
-        model = genai.GenerativeModel(
-            model_name=model_name,
+    response = client.models.generate_content(
+        model=gen_cfg["model"],
+        contents=user_prompt,
+        config=genai_types.GenerateContentConfig(
             system_instruction=SYSTEM_INSTRUCTION,
+            temperature=gen_cfg["temperature"],
+            max_output_tokens=6144,
             tools=tools,
-            generation_config={
-                "temperature": gen_cfg["temperature"],
-                "max_output_tokens": 4096,
-            },
-        )
+        ),
+    )
 
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                response = model.generate_content(user_prompt)
-                print(f"Respuesta obtenida con modelo: {model_name}")
-                text = response.text.strip()
-                break
-            except Exception as e:
-                last_error = e
-                is_transient = "503" in str(e) or "UNAVAILABLE" in str(e) or "overloaded" in str(e).lower() or "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)
-                if attempt < max_retries - 1 and is_transient:
-                    wait = 2 ** attempt * 5  # 5, 10, 20s
-                    print(f"{model_name} error transitorio - reintentando en {wait}s (intento {attempt+1}/{max_retries})...")
-                    time.sleep(wait)
-                elif is_transient:
-                    print(f"{model_name} agotó reintentos, probando siguiente modelo...")
-                    break
-                else:
-                    raise
-        else:
-            continue
-        break
-    else:
-        raise last_error
+    text = (response.text or "").strip()
 
-    # Limpiar fences por si el modelo los añade a pesar de la instrucción
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?\s*", "", text)
         text = re.sub(r"\s*```\s*$", "", text)
 
-    # Intento parseo directo; si falla, busco el primer bloque JSON válido
     try:
         return json.loads(text)
     except json.JSONDecodeError:
@@ -235,9 +271,6 @@ def call_gemini(config: dict, pillar: dict, recent_angles: list) -> dict:
         raise
 
 
-# ----------------------------------------------------------------------------
-# Renderizado de slides HTML → PNG
-# ----------------------------------------------------------------------------
 def escape_html(text: str) -> str:
     return (
         text.replace("&", "&amp;")
@@ -247,7 +280,6 @@ def escape_html(text: str) -> str:
 
 
 def highlight_in_title(title: str, word: str) -> str:
-    """Envuelve la palabra a destacar en un <span class='highlight'>."""
     if not word or word not in title:
         return escape_html(title)
     safe_title = escape_html(title)
@@ -257,8 +289,7 @@ def highlight_in_title(title: str, word: str) -> str:
     )
 
 
-def render_slide_content(slide: dict) -> tuple[str, str]:
-    """Devuelve (clase CSS, HTML interno) para un slide."""
+def render_slide_content(slide: dict):
     stype = slide.get("type", "content")
 
     if stype == "cover":
@@ -280,11 +311,10 @@ def render_slide_content(slide: dict) -> tuple[str, str]:
         inner = f"""
         <h2>{highlight_in_title(slide.get('title', ''), slide.get('highlight_word', ''))}</h2>
         <div class="cta-text">{escape_html(slide.get('cta_text', ''))}</div>
-        <div class="cta-box">Sígueme para más <span class="arrow">→</span></div>
+        <div class="cta-box">Sigueme para mas <span class="arrow">-></span></div>
         """
         return "outro", inner
 
-    # default: content
     inner = f"""
     <div class="label">{escape_html(slide.get('label', ''))}</div>
     <h2>{escape_html(slide.get('heading', ''))}</h2>
@@ -293,11 +323,9 @@ def render_slide_content(slide: dict) -> tuple[str, str]:
     return "content", inner
 
 
-def render_slides_to_png(slides: list, pillar_name: str) -> list[Path]:
-    """Renderiza cada slide como PNG usando Playwright."""
+def render_slides_to_png(slides: list, pillar_name: str) -> list:
     BUILD_DIR.mkdir(exist_ok=True)
 
-    # Leer plantilla base y CSS
     base_html = (TEMPLATES_DIR / "base.html").read_text(encoding="utf-8")
     css = (TEMPLATES_DIR / "styles.css").read_text(encoding="utf-8")
 
@@ -321,19 +349,17 @@ def render_slides_to_png(slides: list, pillar_name: str) -> list[Path]:
         html_path.write_text(html, encoding="utf-8")
         html_files.append(html_path)
 
-    # Capturar con Playwright
     png_paths = []
     with sync_playwright() as p:
         browser = p.chromium.launch()
         context = browser.new_context(
             viewport={"width": 1080, "height": 1350},
-            device_scale_factor=2,  # retina = crisp
+            device_scale_factor=2,
         )
         page = context.new_page()
 
         for i, html_path in enumerate(html_files, start=1):
             page.goto(f"file://{html_path}")
-            # Esperar a que las fuentes de Google se carguen
             page.evaluate("document.fonts.ready")
             page.wait_for_timeout(800)
 
@@ -346,12 +372,37 @@ def render_slides_to_png(slides: list, pillar_name: str) -> list[Path]:
     return png_paths
 
 
-# ----------------------------------------------------------------------------
-# Creación del issue en GitHub
-# ----------------------------------------------------------------------------
-def create_github_issue(
-    result: dict, pillar: dict, png_paths: list[Path], run_id: str | None
-) -> None:
+def format_research_phase(research: dict) -> str:
+    if not research:
+        return "(sin datos de investigacion)"
+
+    lines = []
+    lines.append(f"**Modo:** `{research.get('mode', 'desconocido')}`")
+    lines.append(f"**Razon:** {research.get('mode_reason', '-')}")
+
+    queries = research.get("queries_used", [])
+    if queries:
+        lines.append("\n**Queries usadas:**")
+        for q in queries:
+            lines.append(f"- `{q}`")
+
+    news = research.get("news_found", [])
+    if news:
+        lines.append("\n**Noticias encontradas:**")
+        for n in news:
+            title = n.get("title", "")
+            url = n.get("url", "")
+            date = n.get("date", "")
+            why = n.get("why_relevant", "")
+            if url:
+                lines.append(f"- [{title}]({url}) - {date} - {why}")
+            else:
+                lines.append(f"- {title} - {date} - {why}")
+
+    return "\n".join(lines)
+
+
+def create_github_issue(result, pillar, png_paths, run_id):
     token = os.environ["GITHUB_TOKEN"]
     repo = os.environ["GITHUB_REPOSITORY"]
     now = datetime.now(MADRID_TZ)
@@ -360,7 +411,7 @@ def create_github_issue(
     if run_id:
         artifact_url = f"https://github.com/{repo}/actions/runs/{run_id}"
         visual_links = (
-            f"\n\n📎 **Descarga el carrusel** (PNGs 1080×1350): "
+            f"\n\nDescarga el carrusel (PNGs 1080x1350): "
             f"[artifact del workflow]({artifact_url})\n"
         )
 
@@ -370,50 +421,50 @@ def create_github_issue(
         for i, s in enumerate(result.get("slides", []))
     )
 
-    body = f"""## 📌 Post de {pillar['name']}
+    research_md = format_research_phase(result.get("research_phase", {}))
+
+    body = f"""## Post de {pillar['name']}
 
 > {result.get('angle_chosen', '')}
 
-**Hora sugerida:** {result.get('best_publish_time', '—')}
+**Hora sugerida:** {result.get('best_publish_time', '-')}
 
 ---
 
-### 🔍 Investigación
-{result.get('research_summary', '')}
+### Fase de investigacion
+{research_md}
 
 ---
 
-### ✍️ Post listo para copiar
+### Post listo para copiar
 
-```
 {result.get('post_body', '')}
-```
 
 ---
 
-### 🪝 Gancho alternativo
+### Gancho alternativo
 
 > {result.get('hook_alternative', '')}
 
 ---
 
-### 🖼️ Carrusel ({len(png_paths)} slides)
+### Carrusel ({len(png_paths)} slides)
 
 {slides_preview}
 {visual_links}
 
 ---
 
-### 🎯 Por qué este post posiciona
+### Por que este post posiciona
 
 {result.get('positioning_note', '')}
 
 ---
 
-<sub>Generado por linkedin-content-agent · {now:%Y-%m-%d %H:%M} Madrid · Cierra este issue cuando publiques.</sub>
+<sub>Generado por linkedin-content-agent v2 - {now:%Y-%m-%d %H:%M} Madrid - Cierra este issue cuando publiques.</sub>
 """
 
-    title = f"📝 {pillar['name']} — {now:%d/%m} — {result.get('angle_chosen', '')[:50]}"
+    title = f"Post {pillar['name']} - {now:%d/%m} - {result.get('angle_chosen', '')[:50]}"
 
     url = f"https://api.github.com/repos/{repo}/issues"
     headers = {
@@ -431,9 +482,6 @@ def create_github_issue(
     print(f"Issue creado: {resp.json()['html_url']}")
 
 
-# ----------------------------------------------------------------------------
-# Main
-# ----------------------------------------------------------------------------
 def main() -> int:
     config = load_config()
     state = load_state()
@@ -441,9 +489,12 @@ def main() -> int:
 
     print(f"[{datetime.now(MADRID_TZ):%Y-%m-%d %H:%M}] Pilar: {pillar['name']}")
 
-    print("Llamando a Gemini con Google Search...")
+    print("Llamando a Gemini con Google Search (flujo 2 fases)...")
     result = call_gemini(config, pillar, state.get("recent_angles", []))
-    print(f"Ángulo elegido: {result.get('angle_chosen')}")
+
+    research = result.get("research_phase", {})
+    print(f"Modo: {research.get('mode', 'desconocido')}")
+    print(f"Angulo elegido: {result.get('angle_chosen')}")
 
     print("Renderizando slides...")
     png_paths = render_slides_to_png(result["slides"], pillar["name"])
@@ -453,7 +504,6 @@ def main() -> int:
     run_id = os.environ.get("GITHUB_RUN_ID")
     create_github_issue(result, pillar, png_paths, run_id)
 
-    # Actualizar estado
     state.setdefault("recent_angles", []).append(result.get("angle_chosen", "")[:80])
     state["recent_angles"] = state["recent_angles"][-12:]
     save_state(state)

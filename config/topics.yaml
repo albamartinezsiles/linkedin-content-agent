@@ -1,12 +1,17 @@
 # ============================================================================
 # Configuración pública del agente — pilares, voz, reglas
-# Este archivo ES público (va en el repo). Los datos personales están en profile.yaml
 # ============================================================================
 
 voice:
-  style: "directo, sin corporate, cero buzzwords, opinado con fundamento"
-  length_chars: [900, 1400]
+  style: "directo, técnico pero accesible, opinado con fundamento, cero corporate"
+  length_chars: [1000, 1500]
   hashtags_count: [3, 5]
+  technical_level: >
+    Nivel 'dev con 3 años': el lector sabe HTML/CSS/JS, React básico, qué es una API,
+    qué es Git, qué es un framework. NO asume: Server Components, Suspense, Edge
+    runtime, WebAssembly, detalles de algoritmos de caché, compilers internals.
+    Cuando aparezca un término específico o nuevo, explícalo en 1 frase.
+    No uses inglés innecesariamente, pero sí nombres propios (Next.js, Vite, Astro).
 
   avoid:
     - "En el mundo actual..."
@@ -16,97 +21,167 @@ voice:
     - '"¿Qué opinas?" como cierre genérico'
     - "emojis decorativos (cohetes, fueguitos, manitas)"
     - "palabras que huelen a IA: crucial, en definitiva, revolucionario, fundamental"
-    - "listas de 10 items, formato clickbait"
     - "frases motivacionales vacías"
+    - "listas de 10 items, formato clickbait"
+    - "reflexiones abstractas sin datos ni ejemplos concretos"
 
   do:
-    - "Abrir con problema concreto, cifra, o afirmación contraintuitiva"
-    - "Frases cortas, líneas separadas por salto de línea para legibilidad móvil"
-    - "Datos o anécdotas reales cuando sea posible"
-    - "Cerrar con pregunta específica o con opinión firme, nunca vago"
-    - "Tono humano: primera persona, admitir dudas, mostrar proceso"
+    - "Abrir citando un hecho concreto, cifra o noticia reciente con fuente"
+    - "Usar nombres propios: herramientas, versiones, autores, blogs"
+    - "Frases cortas, líneas separadas por saltos de línea (legibilidad móvil)"
+    - "Dar opinión firme cuando la tengas, admitir dudas cuando no"
+    - "Cerrar con una pregunta concreta o con una postura clara"
+    - "Incluir al menos un ejemplo de código, stack concreto o caso real"
 
 # ============================================================================
-# PILARES — el agente rota por estos en cada publicación
+# PILARES — rediseñados con densidad técnica alta
 # ============================================================================
 
 pillars:
 
-  - id: dev_general
-    name: "Programación / dev general"
+  - id: frontend_modern
+    name: "Frontend moderno"
     weight: 1
     angle: >
-      Enfoque práctico: cosas que un dev web real se encuentra en el día a día.
-      Bugs raros, decisiones de arquitectura pequeñas pero importantes,
-      herramientas infravaloradas, cosas que aprendiste a la mala.
-      EVITAR: tutoriales básicos, "10 tips para X", listas genéricas.
+      Novedades reales del ecosistema frontend: releases de Next.js, Astro, Vite,
+      React, Svelte, Vue, Tailwind, Bun, Biome, build tools. Fallos conocidos de
+      frameworks populares, decisiones de arquitectura con impacto medible,
+      herramientas emergentes que merecen atención. Post tipo "ha salido X, esto es
+      lo que cambia y mi opinión", no tutorial básico.
+    search_queries:
+      - "Next.js release"
+      - "Astro release notes"
+      - "Vite release"
+      - "React 19 update"
+      - "Tailwind CSS update"
+      - "frontend news this week"
+    good_sources:
+      - "vercel.com/blog"
+      - "astro.build/blog"
+      - "github.com releases pages"
+      - "css-tricks.com"
+      - "smashingmagazine.com"
+      - "web.dev"
     example_hooks:
-      - "Llevo 3 horas debuggeando un CORS que no era CORS."
-      - "El 90% de los devs junior no sabe leer un stack trace. Yo tampoco sabía."
-      - "Hoy he borrado 400 líneas de código y la app va igual de bien."
+      - "React 19 llega estable y nadie está hablando del cambio que más te va a afectar."
+      - "Llevo una semana con Astro 5 en producción. Esto es lo que no te dicen en la documentación."
+      - "Vite 6 cambió cómo trata las variables de entorno. Si no lo sabes, tus builds rompen en silencio."
 
-  - id: wordpress_advanced
-    name: "WordPress avanzado"
+  - id: wordpress_pro
+    name: "WordPress profesional"
     weight: 1
     angle: >
-      El WordPress que NO se ve en YouTube. Temas profesionales (Enfold, Divi),
-      performance real (Core Web Vitals, LCP, CLS), LiteSpeed Cache, SEO técnico,
-      hreflang, multilingüe de verdad, integración con Tailwind, fixes oscuros.
-      Público objetivo: devs que ya saben WordPress y quieren más.
-      EVITAR: "cómo instalar WordPress", comparativas de hostings básicas.
+      WordPress a nivel pro, que nadie cuenta en YouTube. Novedades de core
+      (releases 6.x), performance real (Core Web Vitals, LCP, CLS), LiteSpeed
+      Cache, fixes oscuros de temas profesionales como Enfold o Divi, block themes,
+      integración con Tailwind. Post tipo "he resuelto X bug de producción" o
+      "sale versión Y de WP y esto significa...".
+    search_queries:
+      - "WordPress release"
+      - "Gutenberg update"
+      - "Core Web Vitals WordPress"
+      - "LiteSpeed Cache release"
+      - "WordPress performance 2026"
+      - "Enfold theme update"
+    good_sources:
+      - "wordpress.org/news"
+      - "make.wordpress.org/core"
+      - "web.dev"
+      - "kinsta.com/blog"
+      - "wpbeaverbuilder.com/blog"
     example_hooks:
-      - "LiteSpeed Cache con JS Combine activado rompe el 40% de los sitios complejos."
-      - "Self-hostear Google Fonts no es solo por RGPD: es por 200ms de LCP."
-      - "El 90% de los sitios WordPress multiidioma tienen hreflang mal puesto."
+      - "WordPress 6.8 cambió cómo se cargan las fuentes. El 80% de los sitios perdieron puntos de LCP sin enterarse."
+      - "Llevo 3 horas debuggeando un problema de LiteSpeed que no era de LiteSpeed."
+      - "Hay un fix de una línea para el bug más común de Enfold + Gutenberg. Lleva meses sin documentarse."
 
   - id: ai_for_devs
     name: "IA aplicada al trabajo de dev"
     weight: 1
     angle: >
-      Cómo usar IA (Claude, Copilot, Cursor, Gemini, agentes) para ser MÁS dev,
-      no para sustituir devs. Workflows reales, prompts que funcionan,
-      casos donde la IA ha fallado y por qué, integración con tu stack.
-      EVITAR: hype de "la IA cambiará todo", noticias de OpenAI sin análisis.
+      Cómo usar IA para ser MÁS dev, no menos. Novedades de Claude, Cursor,
+      Copilot, agentes, MCPs, Gemini CLI. Workflows reales con nombres propios
+      y métricas concretas. Casos donde la IA falla y por qué. Post tipo
+      "ha salido X modelo/herramienta, mi experiencia real" o "así he automatizado Y
+      con código que puedes copiar".
+    search_queries:
+      - "Claude release Anthropic"
+      - "Cursor new feature"
+      - "AI coding tools 2026"
+      - "MCP server release"
+      - "GitHub Copilot update"
+      - "AI agents developers"
+    good_sources:
+      - "anthropic.com/news"
+      - "cursor.com/blog"
+      - "github.blog"
+      - "simonwillison.net"
+      - "news.ycombinator.com"
     example_hooks:
-      - "He automatizado mis posts de LinkedIn con IA. Aquí el código y por qué funciona."
-      - "La IA no es mejor que yo escribiendo CSS. Es mejor recordándome el CSS que ya sé."
-      - "3 meses usando Cursor a diario. Esto es lo que ha cambiado y lo que no."
+      - "Claude Sonnet 4.5 salió ayer. Lo he probado en mi workflow real y esto es lo que cambia."
+      - "Llevo 2 meses con Cursor Composer. Ha cambiado mi forma de debuggear, no de escribir código."
+      - "Monté un agente para automatizar mis posts de LinkedIn. El código está en GitHub, te cuento cómo funciona."
 
-  - id: ux_ui_web
-    name: "UX/UI y diseño web"
+  - id: web_performance
+    name: "Performance web y UX técnico"
     weight: 1
     angle: >
-      Intersección dev + diseño. Accesibilidad REAL (WCAG AA en la vida real, no en auditorías),
-      micro-interacciones, tipografía web, sistemas de diseño, decisiones de UI
-      con impacto en negocio. Desde la perspectiva de quien implementa, no solo diseña.
-      EVITAR: "tendencias de diseño 2026", reviews de plugins de Figma.
+      Intersección entre frontend, UX y performance medido. Core Web Vitals,
+      accesibilidad real (WCAG AA en vida real, no auditorías de mentira),
+      técnicas de optimización concretas (lazy loading, prefetching, fonts,
+      imágenes), debates sobre diseño que importan al negocio. Post tipo
+      "cambié X y el LCP bajó Y ms" o "esta técnica de CSS se ha infravalorado".
+    search_queries:
+      - "Core Web Vitals 2026"
+      - "web performance news"
+      - "LCP optimization"
+      - "WCAG update"
+      - "CSS new feature"
+      - "accessibility web update"
+    good_sources:
+      - "web.dev"
+      - "developer.mozilla.org/blog"
+      - "smashingmagazine.com"
+      - "css-tricks.com"
+      - "a11yproject.com"
     example_hooks:
-      - "Cambié un botón de 'Enviar' a 'Ver precio' y las conversiones subieron un 23%."
-      - "El dark mode no es accesibilidad. A veces es lo contrario."
-      - "Contraste 4.5:1 no basta. Te explico por qué con 3 ejemplos reales."
+      - "Google cambió cómo se mide INP en marzo. Lo revisé en 5 proyectos reales y esto es lo que encontré."
+      - "Self-hostear Google Fonts no es solo privacidad. Son 180ms de LCP que estás regalando."
+      - "El 90% de los modales en producción son trampas de accesibilidad. Aquí tienes el fix real."
 
   - id: career_women_tech
     name: "Carrera, soft skills, mujer en tech"
-    weight: 0.6
+    weight: 0.3
     angle: >
-      Experiencias reales, opiniones honestas, sin victimismo ni
-      discursos de LinkedIn genéricos. Negociación, síndrome del impostor con datos,
-      cómo es trabajar en entornos mixtos, decisiones de carrera.
-      Este pilar es el que más engagement da pero el más fácil de hacer mal.
-      EVITAR: "mujeres poderosas", frases motivacionales, generalizaciones.
+      Pilar de baja frecuencia. SOLO usar cuando haya una noticia real (informe,
+      estudio, polémica del sector) que permita anclar una opinión concreta con
+      datos propios. EVITAR: reflexiones abstractas, frases motivacionales,
+      generalizaciones. Debe sentirse como "leí este informe, esto es lo que
+      veo en mi realidad" — nunca "qué difícil es ser mujer en tech".
+    search_queries:
+      - "women in tech report 2026"
+      - "gender pay gap tech"
+      - "developer hiring report"
+      - "tech layoffs 2026"
+      - "junior developer market"
+    good_sources:
+      - "stackoverflow.blog/survey"
+      - "github.blog/research"
+      - "developer.mozilla.org/blog"
+      - "reports oficiales de la UE o INE"
     example_hooks:
-      - "Llevo 3 años como dev. La mejor decisión que tomé fue decir 'no sé'."
-      - "En mi equipo somos 2 mujeres de 11. No es un problema. El problema es otro."
-      - "Rechacé una oferta con 15k más. Por qué, y si me arrepiento."
+      - "Salió el informe de Stack Overflow 2026. Esto es lo que coincide con mi experiencia y lo que no."
+      - "Un dato del último State of JS me ha dejado tocada. Te explico por qué."
+      - "Rechacé una oferta con 15k más. Ahora que llevo 6 meses sé si fue buena decisión."
 
 # ============================================================================
 # Parámetros del modelo
 # ============================================================================
 
 generation:
-  model: "gemini-2.5-pro"
-  fallback_models:
-    - "gemini-2.5-flash"
-  temperature: 0.9
+  model: "gemini-2.5-flash"
+  temperature: 0.85
   enable_search: true
-  num_slides: 5  # portada + 3 contenido + cierre
+  num_slides: 5
+  require_news_anchor: true   # exigir noticia real con URL y fecha
+  allow_opinion_fallback: true  # si no hay noticia buena, permitir opinion piece técnico
+  max_news_age_days: 14       # rechazar noticias más viejas que esto
