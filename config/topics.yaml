@@ -178,7 +178,9 @@ pillars:
 # ============================================================================
 
 generation:
-  model: "gemini-2.5-flash"
+  model: "gemini-2.5-pro"
+  fallback_models:
+    - "gemini-2.5-flash"
   temperature: 0.85
   enable_search: true
   num_slides: 5

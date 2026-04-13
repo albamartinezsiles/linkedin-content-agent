@@ -15,6 +15,7 @@ import os
 import sys
 import json
 import random
+import time
 import yaml
 import re
 from datetime import datetime, timezone, timedelta
@@ -245,16 +246,45 @@ def call_gemini(config: dict, pillar: dict, recent_angles: list) -> dict:
     if gen_cfg.get("enable_search"):
         tools = [genai_types.Tool(google_search=genai_types.GoogleSearch())]
 
-    response = client.models.generate_content(
-        model=gen_cfg["model"],
-        contents=user_prompt,
-        config=genai_types.GenerateContentConfig(
-            system_instruction=SYSTEM_INSTRUCTION,
-            temperature=gen_cfg["temperature"],
-            max_output_tokens=6144,
-            tools=tools,
-        ),
-    )
+    models_to_try = [gen_cfg["model"]] + gen_cfg.get("fallback_models", [])
+    last_error = None
+    response = None
+
+    for model_name in models_to_try:
+        print(f"Intentando con modelo: {model_name}")
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=user_prompt,
+                    config=genai_types.GenerateContentConfig(
+                        system_instruction=SYSTEM_INSTRUCTION,
+                        temperature=gen_cfg["temperature"],
+                        max_output_tokens=6144,
+                        tools=tools,
+                    ),
+                )
+                print(f"Respuesta obtenida con modelo: {model_name}")
+                break
+            except Exception as e:
+                last_error = e
+                err_str = str(e)
+                is_transient = any(k in err_str for k in ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED")) or "overloaded" in err_str.lower()
+                if attempt < max_retries - 1 and is_transient:
+                    wait = 2 ** attempt * 5
+                    print(f"{model_name} error transitorio - reintentando en {wait}s (intento {attempt+1}/{max_retries})...")
+                    time.sleep(wait)
+                elif is_transient:
+                    print(f"{model_name} agotó reintentos, probando siguiente modelo...")
+                    break
+                else:
+                    raise
+        else:
+            continue
+        break
+    else:
+        raise last_error
 
     text = (response.text or "").strip()
 
