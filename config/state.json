@@ -1,10 +1,11 @@
 {
-  "last_pillar_index": 0,
+  "last_pillar_index": 1,
   "recent_angles": [
     "El coste oculto de la 'conveniencia' en desarrollo web y cómo la IA puede disimu",
     "La actualización de Core Web Vitals de Google de marzo de 2026 expone la deuda t",
     "Claude Opus 4.7 y la evolución de Cursor redefinen el rol del desarrollador: de ",
     "El nuevo umbral de LCP de 2.0s y la evaluación de Core Web Vitals a nivel de sit",
-    "Vite 8.0 y Rolldown: más que velocidad, una redefinición del build process."
+    "Vite 8.0 y Rolldown: más que velocidad, una redefinición del build process.",
+    "El retraso de WordPress 7.0 y la promesa del 'PHP-only block registration' para "
   ]
 }
