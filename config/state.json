@@ -1,7 +1,6 @@
 {
-  "last_pillar_index": 3,
+  "last_pillar_index": 0,
   "recent_angles": [
-    "El retraso de WordPress 7.0 y la promesa del 'PHP-only block registration' para ",
     "Cursor 'Build in Parallel' con subagentes y la nueva revisión de PRs cambia el j",
     "La extensión de plazos de WCAG 2.1 AA por HHS y DOJ: no es un respiro, es una úl",
     "Las vulnerabilidades de Next.js resaltan la complejidad de la seguridad en frame",
@@ -12,6 +11,7 @@
     "Astro 6.4 y su procesador Markdown Sätteri: la velocidad de Rust llega a tu buil",
     "El retraso de WordPress 7.0 y la retirada de la co-edición en tiempo real por la",
     "Cómo el nuevo Design Mode de Cursor y sus mejoras en el SDK están transformando ",
-    "El último informe de Core Web Vitals de mayo de 2026 revela una caída en la tasa"
+    "El último informe de Core Web Vitals de mayo de 2026 revela una caída en la tasa",
+    "Next.js 16.2.9: Más allá del marketing, la estabilidad real que tu proyecto nece"
   ]
 }
