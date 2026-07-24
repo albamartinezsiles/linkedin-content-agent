@@ -1,7 +1,6 @@
 {
-  "last_pillar_index": 1,
+  "last_pillar_index": 2,
   "recent_angles": [
-    "El último informe de Core Web Vitals de mayo de 2026 revela una caída en la tasa",
     "Next.js 16.2.9: Más allá del marketing, la estabilidad real que tu proyecto nece",
     "WordPress 7.0 sin colaboración en tiempo real: ¿sacrificio necesario por la esta",
     "Cursor se transforma en una plataforma de AI para desarrolladores, llevando los ",
@@ -12,6 +11,7 @@
     "Cursor lanza 'Automations' y su app iOS: la IA como copiloto proactivo, no solo ",
     "Centrar elementos en CSS: de hacks históricos a estándares declarativos y nuevas",
     "Astro 7.1 mejora la flexibilidad del desarrollo con control de paginación y gest",
-    "La urgencia y el impacto real de las actualizaciones de seguridad en WordPress p"
+    "La urgencia y el impacto real de las actualizaciones de seguridad en WordPress p",
+    "El incidente del agente de IA de OpenAI y Hugging Face: una llamada de atención "
   ]
 }
