@@ -1,7 +1,6 @@
 {
-  "last_pillar_index": 2,
+  "last_pillar_index": 3,
   "recent_angles": [
-    "Análisis de la Estrategia de Igualdad de Género de la UE 2026-2030 y su impacto ",
     "WordPress revierte la actualización a React 19: una lección sobre la fragilidad ",
     "WordPress 7.1 y la migración a React 19: un salto que exige rigor a los desarrol",
     "Cursor lanza 'Automations' y su app iOS: la IA como copiloto proactivo, no solo ",
@@ -12,6 +11,7 @@
     "El error común en la optimización de LCP: no es solo la imagen, es la detección ",
     "La reciente actualización de seguridad de Next.js expone vulnerabilidades crític",
     "La urgencia de actualizar a WordPress 7.0.2 para evitar vulnerabilidades crítica",
-    "El impacto de la nueva especificación MCP 2.0 y su arquitectura stateless en la "
+    "El impacto de la nueva especificación MCP 2.0 y su arquitectura stateless en la ",
+    "Las CSS Scroll-Driven Animations son una herramienta poderosa, pero su mala impl"
   ]
 }
